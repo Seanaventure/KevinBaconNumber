@@ -14,7 +14,7 @@ class findSep:
     # Contains the actors and movies that were checked
     checked = list()
 
-    actor = namedtuple("actor", "name id perviousRelations")
+    Actor = namedtuple("Actor", "name id perviousRelations")
     def getInput(self):
         self.actor = input("What celebrity would you like? ")
         print("Finding connection")
@@ -31,43 +31,46 @@ class findSep:
             for line in actorList:
                 foundActor = json.loads(line)["name"]
                 if actorName == foundActor:
-                    print("Actor id: " + str(json.loads(line)["id"]))
+                    # print("Actor id: " + str(json.loads(line)["id"]))
                     actorID = str(json.loads(line)["id"])
-        self.startSearch((actorID, actorName))
+        startActor = self.Actor(actorName, actorID, [(actorName, "IDK")])
+        self.startSearch(startActor)
 
     def startSearch(self, startActor):
 
         # Checks to see if there is a direct link
         self.compareID()
-        films = self.listOfFilms(startActor[0])
-        if self.compareMovies(startActor[0])[0]:
+        films = self.listOfFilms(startActor.id)
+        if self.compareMovies(startActor.id)[0]:
             print("Done!")
             #return
         else:
-            self.checked.append(startActor[1])
+            self.checked.append(startActor.id)
         """
         Once we get to this point we can assume that there is no direct connection between the two people.
         From this point we need to go into each individual movie and look at the cast members, and see if they have any 
         relation to Kevin Bacon. It is going to be a modified breadth first search
         """
-        depth = 1
         queue = deque()
-        queue = self.addToQueue(queue, films)
-        print("added people to queue")
+        queue = self.addToQueue(queue, startActor)
         while len(queue) > 0:
             actor = queue.popleft()
-            one = actor['name']
-            two = startActor[1]
-            if one not in self.checked:
-                print("Checking " + actor['name'])
-                result = self.compareMovies(actor['id'])
+            if actor.id not in self.checked:
+                # print("Checking " + actor.name)
+                result = self.compareMovies(actor.id)
                 if result[0]:
-                    print("Found a match, both in " + result[1])
+                    # print("Found a match, both in " + result[1])
+                    msg = startActor.name + " was in "
+                    for i in range(1, len(actor.perviousRelations)):
+                        msg = msg + actor.perviousRelations[i][1] + " with " + actor.perviousRelations[i][0] + " who was in "
+                    msg = msg + str(result[1]) + " with Kevin Bacon"
+                    print(msg)
                     return
                 else:
-                    queue = self.addToQueue(queue, self.listOfFilms(actor['id']))
-                    self.checked.append(one)
-    def addToQueue(self, oldQueue: deque, films):
+                    queue = self.addToQueue(queue, actor)
+                    self.checked.append(actor.id)
+
+    def addToQueue(self, oldQueue: deque, prevActor):
         """
         This basically handles the Queue for the breadth first search. If an actor has no direct relationship to Kevin
         Bacon then we take th top 5 cast members from their top 5 movies and put them in the queue to search for
@@ -76,6 +79,7 @@ class findSep:
         :param films:
         :return:
         """
+        films = self.listOfFilms(prevActor.id)
         if len(films) > 5:
             max = 5
         else:
@@ -96,11 +100,20 @@ class findSep:
                 time.sleep(2)
                 print("Done Sleeping")
             if len(cast) > 5:
-                max = 5
+                max2 = 5
             else:
-                max = len(cast)
-            for i in range(max):
-                oldQueue.append(cast[i])
+                max2 = len(cast)
+            for j in range(max2):
+                oldList = prevActor.perviousRelations
+                name = cast[j]['name']
+                try:
+                    film = films[i][1]
+                except:
+                    print("test")
+                newList = oldList[:]
+                newList.append((cast[i]['name'], films[i][1]))
+                newActor = self.Actor(name=cast[i]['name'], id=cast[i]['id'], perviousRelations=newList)
+                oldQueue.append(newActor)
         return oldQueue
 
     def compareID(self):
@@ -134,7 +147,7 @@ class findSep:
     def listOfFilms(self, actorID):
         """
         This gets the list of films this current actor was in
-        :return:
+        :return: a tuple with movie id and name
         """
         params = {"api_key" : self.API_KEY, "language" : "en-US"}
         url = "https://api.themoviedb.org/3/person/" + str(actorID) + "/movie_credits"
@@ -147,6 +160,7 @@ class findSep:
         try:
             movies = json.loads(r.text)['cast']
         except:
+            print(r.text)
             print("Switching key")
             self.switchKey()
         movieList = list()
