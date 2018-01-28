@@ -1,3 +1,8 @@
+"""
+Here you can see me attemping to get networking working. It did not work
+The Html should be in here too
+"""
+
 from flask import Flask
 from DegreeOfSeperation import findSep
 app = Flask(__name__)
