@@ -1,1 +1,6 @@
-The Kevin Bacon Degree of separation is the amount of actors it takes to get to Kevin Bacon
+The Kevin Bacon Degree of separation is the amount of actors it takes to get to Kevin Bacon. This program find that number for
+any two movie stars you want. The main file is DegreeOfSeperation.py. Surprisingly main.py is not the main file. Who would
+guess. 
+
+Note: Sometimes if you enter a name like Chris it won't work because they API has their name as Christopher. Have fun. Also
+it may take up to a minute for some combos. Just wait it out.
