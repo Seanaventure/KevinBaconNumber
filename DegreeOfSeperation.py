@@ -149,7 +149,11 @@ class findSep:
         except:
             print("Switching Key")
             self.switchKey()
-        cast = json.loads(r.text)["cast"]
+        try:
+            cast = json.loads(r.text)["cast"]
+        except:
+            print("Could not find those stars")
+            sys.exit()
         for i in range(len(cast)):
             # print("Kevin Bacon Movie ID: " + cast[i]["credit_id"])
             self.targetMovies.append((cast[i]["id"], cast[i]['original_title']))
