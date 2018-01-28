@@ -3,16 +3,18 @@ import json
 import sys
 import time
 from collections import deque
+from collections import namedtuple
 class findSep:
     kevinBacon = "Kevin Bacon"
     API_KEY = sys.argv[1]
-
+    ALTERNATE_KEY = sys.argv[2]
     # List of movies Kevin Bacon was in so we can skip some steps
     kevinBaconMovies = list()
 
     # Contains the actors and movies that were checked
     checked = list()
 
+    actor = namedtuple("actor", "name id perviousRelations")
     def getInput(self):
         self.actor = input("What celebrity would you like? ")
         print("Finding connection")
@@ -42,7 +44,7 @@ class findSep:
             print("Done!")
             #return
         else:
-            self.checked.append(startActor[0])
+            self.checked.append(startActor[1])
         """
         Once we get to this point we can assume that there is no direct connection between the two people.
         From this point we need to go into each individual movie and look at the cast members, and see if they have any 
@@ -51,56 +53,55 @@ class findSep:
         depth = 1
         queue = deque()
         queue = self.addToQueue(queue, films)
+        print("added people to queue")
         while len(queue) > 0:
             actor = queue.popleft()
-            result = self.compareMovies(actor['name'])
-            if result[0]:
-                print("Found a match, both in" + result[1])
-            else:
-                queue = self.addToQueue(queue, self.listOfFilms(actor['id']))
-            # for i in range(len(films)):
-            #     print("Searching " + str(films[i][1]))
-            #     movieID = films[i][0]
-            #     payload = {"api_key":self.API_KEY}
-            #     url = "https://api.themoviedb.org/3/movie/" + str(movieID) + "/credits"
-            #     r = requests.get(url, payload)
-            #     cast = json.loads(r.text)["cast"]
-            #     max = 0
-            #     if len(cast) > 10:
-            #         max = 10
-            #     else:
-            #         max = len(cast)
-            #     for j in range(max):
-            #         if cast[j]['id'] not in self.checked:
-            #             result = self.compareMovies(cast[j]['id'])
-            #             print("Checking " + cast[j]['name'])
-            #             if result[0]:
-            #                 print(startActor[1] + " was in " + films[i][1] + " with " + cast[j]['name'] + " who is in " + str(result[1]) + " with Kevin Bacon. Depth: " + str(depth))
-            #                 return
-            #             else:
-            #                 print(cast[j]['name'] + " was added to queue ")
-            #                 queue.append(cast[j])
-            #                 self.checked.append(cast[j][id])
-            #         else:
-            #             print("Going in a level deeper after " + cast[j]['name'])
-
-            depth += 1
-            print("Depth increasing. Now it is " + str(depth))
+            one = actor['name']
+            two = startActor[1]
+            if one not in self.checked:
+                print("Checking " + actor['name'])
+                result = self.compareMovies(actor['id'])
+                if result[0]:
+                    print("Found a match, both in " + result[1])
+                    return
+                else:
+                    queue = self.addToQueue(queue, self.listOfFilms(actor['id']))
+                    self.checked.append(one)
     def addToQueue(self, oldQueue: deque, films):
-        for i in range(len(films)):
+        """
+        This basically handles the Queue for the breadth first search. If an actor has no direct relationship to Kevin
+        Bacon then we take th top 5 cast members from their top 5 movies and put them in the queue to search for
+        them later.
+        :param oldQueue:
+        :param films:
+        :return:
+        """
+        if len(films) > 5:
+            max = 5
+        else:
+            max = len(films)
+        for i in range(max):
             movieID = films[i][0]
             payload = {"api_key": self.API_KEY}
             url = "https://api.themoviedb.org/3/movie/" + str(movieID) + "/credits"
             r = requests.get(url, payload)
-            cast = json.loads(r.text)["cast"]
-            max = 0
-            if len(cast) > 10:
-                max = 10
+            time.sleep(0.1)
+            #print("Movie url:" + r.url)
+            try:
+                cast = json.loads(r.text)["cast"]
+            except:
+                print(r.text)
+                print("Switching Keys")
+                self.switchKey()
+                time.sleep(2)
+                print("Done Sleeping")
+            if len(cast) > 5:
+                max = 5
             else:
                 max = len(cast)
             for i in range(max):
                 oldQueue.append(cast[i])
-            return oldQueue
+        return oldQueue
 
     def compareID(self):
         """
@@ -109,7 +110,11 @@ class findSep:
         """
         params = {"api_key": self.API_KEY, "language": "en-US"}
         url = "https://api.themoviedb.org/3/person/" + str(4724) + "/movie_credits"
-        r = requests.get(url, params)
+        try:
+            r = requests.get(url, params)
+        except:
+            print("Switching Key")
+            self.switchKey()
         cast = json.loads(r.text)["cast"]
         for i in range(len(cast)):
             # print("Kevin Bacon Movie ID: " + cast[i]["credit_id"])
@@ -133,18 +138,26 @@ class findSep:
         """
         params = {"api_key" : self.API_KEY, "language" : "en-US"}
         url = "https://api.themoviedb.org/3/person/" + str(actorID) + "/movie_credits"
-        r = requests.get(url, params)
+        try:
+            r = requests.get(url, params)
+        except:
+            print("Switching Key")
+            self.switchKey()
+        #print(r.url)
         try:
             movies = json.loads(r.text)['cast']
         except:
-            print("API call limit reached")
-            time.sleep(10000)
-            return
+            print("Switching key")
+            self.switchKey()
         movieList = list()
         for i in range(len(movies)):
-            if movies[i]['popularity'] > 8:
+            if movies[i]['popularity'] > 4:
                 movieList.append((movies[i]['id'], movies[i]['original_title']))
         return movieList
 
+    def switchKey(self):
+        pl = self.API_KEY
+        self.API_KEY = self.ALTERNATE_KEY
+        self.ALTERNATE_KEY = pl
 finder = findSep()
 finder.getInput()
