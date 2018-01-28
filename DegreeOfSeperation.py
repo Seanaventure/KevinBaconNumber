@@ -1,3 +1,12 @@
+"""
+This program is a way to find out if any two actors have a relationship movie wise
+Created for BrickHack4
+1/28/18
+
+Authors: Sean Bonaventure, Abhaya Tamrakar
+"""
+
+
 import requests
 import json
 import sys
@@ -5,22 +14,25 @@ import time
 from collections import deque
 from collections import namedtuple
 class findSep:
-    kevinBacon = "Kevin Bacon"
     API_KEY = sys.argv[1]
     ALTERNATE_KEY = sys.argv[2]
     # List of movies Kevin Bacon was in so we can skip some steps
-    kevinBaconMovies = list()
+    targetMovies = list()
 
     # Contains the actors and movies that were checked
     checked = list()
-
+    targetName = ""
     Actor = namedtuple("Actor", "name id perviousRelations")
     def getInput(self):
-        self.actor = input("What celebrity would you like? ")
+        print("Please try and spell the names correctly")
+        self.targetName = input("What star is the target? ")
+        startingPoint = input("What is the other star? ")
+        targetId = self.findID(self.targetName, True)
+        self.targetSetup(targetId)
         print("Finding connection")
-        self.findID(self.actor)
+        self.findID(startingPoint, False)
 
-    def findID(self, actorName):
+    def findID(self, actorName, target):
         """
         Finds ID of an actor
         :param actorName: The actor name
@@ -30,20 +42,31 @@ class findSep:
         with (open("cleaninput.json", 'r', encoding="utf8")) as actorList:
             for line in actorList:
                 foundActor = json.loads(line)["name"]
-                if actorName == foundActor:
+                if actorName.lower() == foundActor.lower():
                     # print("Actor id: " + str(json.loads(line)["id"]))
                     actorID = str(json.loads(line)["id"])
-        startActor = self.Actor(actorName, actorID, [(actorName, "IDK")])
-        self.startSearch(startActor)
+        if target:
+            return actorID
+        else:
+            startActor = self.Actor(actorName, actorID, [(actorName, "IDK")])
+            return self.startSearch(startActor)
 
     def startSearch(self, startActor):
-
+        """
+        The main search method. It is basically a modified breadth first search, treating each actor and movie
+        as a node in the graph. We start by seeing if the target and starting point share a common movie. If they don't
+        we take the top 5 movies of the starting point and get the top 5 actors from all those movies. Then we put all
+        of them in a queue. Then we go through the queue and see if the actors in the queue share a movie with the target.
+        If they don't we take their top 5 movies and top 5 actors from each and put them in the same queue as earlier,
+        and repeat the process
+        :param startActor:
+        :return:
+        """
         # Checks to see if there is a direct link
-        self.compareID()
-        films = self.listOfFilms(startActor.id)
-        if self.compareMovies(startActor.id)[0]:
-            print("Done!")
-            #return
+        result = self.compareMovies(startActor.id)
+        if result[0]:
+            print(startActor.name + " was in " + str(result[1]) + " with " + self.targetName)
+            return
         else:
             self.checked.append(startActor.id)
         """
@@ -56,27 +79,30 @@ class findSep:
         while len(queue) > 0:
             actor = queue.popleft()
             if actor.id not in self.checked:
-                # print("Checking " + actor.name)
+                #print("Checking " + actor.name)
                 result = self.compareMovies(actor.id)
                 if result[0]:
                     # print("Found a match, both in " + result[1])
                     msg = startActor.name + " was in "
                     for i in range(1, len(actor.perviousRelations)):
                         msg = msg + actor.perviousRelations[i][1] + " with " + actor.perviousRelations[i][0] + " who was in "
-                    msg = msg + str(result[1]) + " with Kevin Bacon"
+                    msg = msg + str(result[1]) + " with " + self.targetName
                     print(msg)
-                    return
+                    return msg
                 else:
                     queue = self.addToQueue(queue, actor)
                     self.checked.append(actor.id)
 
-    def addToQueue(self, oldQueue: deque, prevActor):
+    def addToQueue(self, oldQueue, prevActor):
         """
-        This basically handles the Queue for the breadth first search. If an actor has no direct relationship to Kevin
-        Bacon then we take th top 5 cast members from their top 5 movies and put them in the queue to search for
+        This basically handles the Queue for the breadth first search. If an actor has no direct relationship to the target
+        then we take th top 5 cast members from their top 5 movies and put them in the queue to search for
         them later.
-        :param oldQueue:
-        :param films:
+        You may notice the time.sleep(.1). That is because the API only allows 40 calls per 10 seconds so if i make too
+        many calls i get locked out. I found if I .1 seconds between adding actors to the queue I won't hit the limit.
+        I also created a second account and obtained a second key, and if I get locked out of one I switch to the other
+        :param oldQueue: the old queue to be added to
+        :param prevActor: The actor we are being referred from
         :return:
         """
         films = self.listOfFilms(prevActor.id)
@@ -105,24 +131,19 @@ class findSep:
                 max2 = len(cast)
             for j in range(max2):
                 oldList = prevActor.perviousRelations
-                name = cast[j]['name']
-                try:
-                    film = films[i][1]
-                except:
-                    print("test")
                 newList = oldList[:]
-                newList.append((cast[i]['name'], films[i][1]))
-                newActor = self.Actor(name=cast[i]['name'], id=cast[i]['id'], perviousRelations=newList)
+                newList.append((cast[j]['name'], films[i][1]))
+                newActor = self.Actor(name=cast[j]['name'], id=cast[j]['id'], perviousRelations=newList)
                 oldQueue.append(newActor)
         return oldQueue
 
-    def compareID(self):
+    def targetSetup(self, id1):
         """
-        This method find the id for all the movies Kevin Bacon is in so if we see one we have an immediate connection
-        :return:
+        This method find the id for all the movies the target is in so if we see one we have an immediate connection
+        :return: nothing
         """
         params = {"api_key": self.API_KEY, "language": "en-US"}
-        url = "https://api.themoviedb.org/3/person/" + str(4724) + "/movie_credits"
+        url = "https://api.themoviedb.org/3/person/" + str(id1) + "/movie_credits"
         try:
             r = requests.get(url, params)
         except:
@@ -131,14 +152,19 @@ class findSep:
         cast = json.loads(r.text)["cast"]
         for i in range(len(cast)):
             # print("Kevin Bacon Movie ID: " + cast[i]["credit_id"])
-            self.kevinBaconMovies.append((cast[i]["id"], cast[i]['original_title']))
+            self.targetMovies.append((cast[i]["id"], cast[i]['original_title']))
 
     def compareMovies(self, actorID):
+        """
+        Finds out if the target and the current actor are in any similar movies
+        :param actorID: The actors ID
+        :return: If they are return true and the movie they share
+        """
         movieList = self.listOfFilms(actorID)
         for i in range(len(movieList)):
             if movieList[0] not in self.checked:
-                for j in range(len(self.kevinBaconMovies)):
-                    if movieList[i][0] == self.kevinBaconMovies[j][0]:
+                for j in range(len(self.targetMovies)):
+                    if movieList[i][0] == self.targetMovies[j][0]:
                         return True, movieList[i][1]
                     else:
                         self.checked.append(movieList[i][0])
@@ -173,5 +199,6 @@ class findSep:
         pl = self.API_KEY
         self.API_KEY = self.ALTERNATE_KEY
         self.ALTERNATE_KEY = pl
+
 finder = findSep()
 finder.getInput()

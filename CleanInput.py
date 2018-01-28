@@ -1,3 +1,13 @@
+"""
+I downloaded a huge dataset of movie stars from TMBd. It contained a bunch of info, the most important being the id
+the actor uses in the API. Problem was it was huge, like 70mb. Luckily it also contained a popularity rating of
+the star so I just filtered out anyone with below a 1 because they are irrelevant
+
+1/28/18
+
+Author: Sean Bonaventure
+"""
+
 import json
 
 
